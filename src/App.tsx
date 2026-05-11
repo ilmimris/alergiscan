@@ -111,7 +111,13 @@ export default function App() {
     setIsProcessing(true);
     setError(null);
     try {
-      const response = await fetch(`/api/bpom?query=${encodeURIComponent(query)}`);
+      const response = await fetch('/api/bpom', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query })
+      });
       const data = await response.json();
       
       if (!response.ok) {

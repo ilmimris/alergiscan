@@ -13,8 +13,8 @@ async function startServer() {
   app.use(express.json());
 
   // Proxy for BPOM API to avoid CORS issues
-  app.get("/api/bpom", async (req, res) => {
-    const query = req.query.query as string;
+  app.post("/api/bpom", async (req, res) => {
+    const { query } = req.body;
     if (!query) {
       return res.status(400).json({ error: "Query is required" });
     }
@@ -33,13 +33,12 @@ async function startServer() {
       
       const html = await initialResponse.text();
       
-      // Extract cookies carefully
-      const rawCookies = initialResponse.headers.get('set-cookie');
-      let cookieString = '';
-      if (rawCookies) {
-        // Laravel usually sends XSRF-TOKEN and webreg_session
-        cookieString = rawCookies.split(',').map(c => c.split(';')[0].trim()).join('; ');
-      }
+      // Extract cookies carefully using getSetCookie if available
+      const setCookies = (initialResponse.headers as any).getSetCookie 
+        ? (initialResponse.headers as any).getSetCookie() 
+        : (initialResponse.headers.get('set-cookie')?.split(/,(?=[^ ]+=)/) || []);
+      
+      const cookieString = setCookies.map((c: string) => c.split(';')[0].trim()).join('; ');
       
       // Extract CSRF token from meta tag
       const tokenMatch = html.match(/name=["']csrf-token["']\s+content=["']([^"']+)["']/) 
@@ -48,7 +47,6 @@ async function startServer() {
 
       if (!token) {
         console.error("[BPOM Proxy] Failed to extract CSRF token. HTML length:", html.length);
-        // Fallback or log if we're being redirected/blocked
         if (html.includes("Checking your browser") || html.includes("Cloudflare")) {
           return res.status(503).json({ error: "BPOM dilindungi oleh proteksi anti-bot. Coba buka dari tab baru." });
         }
@@ -59,16 +57,29 @@ async function startServer() {
       formData.append('draw', '1');
       formData.append('start', '0');
       formData.append('length', '10');
-      formData.append('query', query);
+      formData.append('search[value]', query);
+      formData.append('search[regex]', 'false');
+      formData.append('query', query); // Keeping both just in case
       
-      // Add required empty fields (Laravel DataTables requirement)
-      const fields = [
+      // Standard DataTables columns
+      const columns = [
         'product_register', 'product_name', 'product_brand', 
         'product_package', 'product_form', 'ingredients', 
         'manufacturer_name', 'status', 'release_date',
         'manufacturer', 'registrar'
       ];
-      fields.forEach(f => formData.append(f, ''));
+      
+      columns.forEach((col, i) => {
+        formData.append(`columns[${i}][data]`, col);
+        formData.append(`columns[${i}][name]`, '');
+        formData.append(`columns[${i}][searchable]`, 'true');
+        formData.append(`columns[${i}][orderable]`, 'true');
+        formData.append(`columns[${i}][search][value]`, '');
+        formData.append(`columns[${i}][search][regex]`, 'false');
+      });
+      
+      formData.append('order[0][column]', '0');
+      formData.append('order[0][dir]', 'asc');
 
       const response = await fetch('https://cekbpom.pom.go.id/produk-dt/all', {
         method: 'POST',
