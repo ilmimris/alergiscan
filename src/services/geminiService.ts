@@ -1,9 +1,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ScanResult, AllergenProfile } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAi() {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is missing. Please set it in your environment variables.");
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 export async function analyzeIngredients(input: { base64?: string; text?: string }, profile: AllergenProfile): Promise<Omit<ScanResult, 'id' | 'timestamp' | 'image'>> {
+  const ai = getAi();
   const allergenList = profile.selected.join(", ") + (profile.custom?.length ? ", " + profile.custom.join(", ") : "");
   
   const prompt = `Analyze this food ingredient ${input.text ? "text" : "label image"}. 

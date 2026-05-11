@@ -3,10 +3,5 @@
   "description": "Scan food packaging ingredients for instant allergen detection and clear safety alerts.",
   "requestFramePermissions": [
     "camera"
-  ],
-  "majorCapabilities": [
-    "AI-powered OCR",
-    "Allergen Matching",
-    "Food Safety Alerts"
   ]
 }

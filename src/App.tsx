@@ -100,18 +100,77 @@ export default function App() {
 
   const startScanning = async () => {
     setView('scanning');
+    setError(null);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
-      });
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      };
+      
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      // Try to apply advanced focus constraints if supported
+      const track = stream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities?.() as any;
+      if (capabilities?.focusMode?.includes('continuous')) {
+        await track.applyConstraints({
+          advanced: [{ focusMode: 'continuous' }] as any
+        });
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
     } catch (err) {
       console.error(err);
-      setError("Izin kamera ditolak atau tidak tersedia.");
+      setError("Kamera tidak dapat diakses. Gunakan fitur upload gambar.");
       setView('home');
     }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      setIsProcessing(true);
+      setError(null);
+      stopScanning(); // Just in case it was open
+      
+      try {
+        const analysis = await analyzeIngredients({ base64 }, profile);
+        const result: ScanResult = {
+          ...analysis,
+          id: crypto.randomUUID(),
+          timestamp: Date.now(),
+          image: base64
+        };
+        
+        setCurrentResult(result);
+        saveHistory(result);
+        setView('result');
+        
+        if (result.status === 'safe') {
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#10b981', '#34d399', '#6ee7b7']
+          });
+        }
+      } catch (err: any) {
+        setError(err.message || "Gagal memproses gambar");
+        setView('home');
+      } finally {
+        setIsProcessing(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const stopScanning = () => {
@@ -284,20 +343,28 @@ export default function App() {
                 <Camera className="w-10 h-10" />
               </div>
               <div className="text-center">
-                <span className="block text-xl font-extrabold uppercase tracking-tight">Mulai Scan</span>
-                <span className="text-white/50 text-xs font-medium">Buka Kamera Pengaman</span>
+                <span className="block text-xl font-extrabold uppercase tracking-tight">Buka Kamera</span>
+                <span className="text-white/50 text-xs font-medium tracking-wide">Fokus otomatis aktif</span>
               </div>
             </div>
           </button>
 
-          <button
-            id="btn-manual-toggle"
-            onClick={() => setShowManual(!showManual)}
-            className="w-full py-4 bg-white border border-slate-200 rounded-2xl font-bold text-slate-600 flex items-center justify-center gap-2 hover:bg-slate-100 hover:border-slate-300 transition-all shadow-sm"
-          >
-            <Plus className="w-5 h-5 text-indigo-600" />
-            Input Manual Teks
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="cursor-pointer py-4 bg-white border border-slate-200 rounded-2xl font-bold text-slate-600 flex items-center justify-center gap-2 hover:bg-slate-100 hover:border-slate-300 transition-all shadow-sm">
+              <History className="w-5 h-5 text-indigo-400 rotate-180" /> {/* Mirror icon for gallery feeling */}
+              Galeri
+              <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+            </label>
+            
+            <button
+              id="btn-manual-toggle"
+              onClick={() => setShowManual(!showManual)}
+              className="py-4 bg-white border border-slate-200 rounded-2xl font-bold text-slate-600 flex items-center justify-center gap-2 hover:bg-slate-100 hover:border-slate-300 transition-all shadow-sm"
+            >
+              <Plus className="w-5 h-5 text-indigo-600" />
+              Text
+            </button>
+          </div>
 
           <AnimatePresence>
             {showManual && (
@@ -446,7 +513,12 @@ export default function App() {
         </div>
       </div>
 
-      <div className="bg-slate-900 p-10 pb-16 flex justify-center items-center">
+      <div className="bg-slate-900 p-6 pb-12 flex justify-between items-center px-10">
+        <label className="p-4 bg-white/10 text-white rounded-2xl backdrop-blur-md border border-white/10 cursor-pointer">
+          <History className="w-6 h-6 rotate-180" />
+          <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
+        </label>
+
         <button 
           id="btn-capture"
           disabled={isProcessing}
@@ -463,6 +535,8 @@ export default function App() {
             {isProcessing && <Loader2 className="w-6 h-6 text-white" />}
           </div>
         </button>
+
+        <div className="w-14"></div> {/* Spacer to center the button */}
       </div>
       <canvas ref={canvasRef} className="hidden" />
     </div>
