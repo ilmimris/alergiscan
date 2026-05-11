@@ -166,12 +166,12 @@ export default function App() {
 
   // Load persistence
   useEffect(() => {
-    const savedProfile = localStorage.getItem('alergiscan_profile');
+    const savedProfile = localStorage.getItem('jajancek_profile');
     if (savedProfile) {
       setProfile(JSON.parse(savedProfile));
       setView('home');
     }
-    const savedHistory = localStorage.getItem('alergiscan_history');
+    const savedHistory = localStorage.getItem('jajancek_history');
     if (savedHistory) {
       setHistory(JSON.parse(savedHistory));
     }
@@ -179,13 +179,13 @@ export default function App() {
 
   const saveProfile = (newProfile: AllergenProfile) => {
     setProfile(newProfile);
-    localStorage.setItem('alergiscan_profile', JSON.stringify(newProfile));
+    localStorage.setItem('jajancek_profile', JSON.stringify(newProfile));
   };
 
   const saveHistory = (newResult: ScanResult) => {
     const updated = [newResult, ...history].slice(0, 20);
     setHistory(updated);
-    localStorage.setItem('alergiscan_history', JSON.stringify(updated));
+    localStorage.setItem('jajancek_history', JSON.stringify(updated));
   };
 
   const startScanning = async () => {
@@ -336,7 +336,7 @@ export default function App() {
               </div>
               <div className="space-y-4">
                 <h1 className="text-4xl font-extrabold tracking-tight text-slate-800 font-sans">
-                  Alergi<span className="text-indigo-600">Scan</span>
+                  Jajan<span className="text-indigo-600">Cek</span>
                 </h1>
                 <p className="text-slate-500 text-lg leading-relaxed font-medium">
                   Scan ingredients kemasan makanan untuk deteksi alergen instan.
@@ -416,7 +416,7 @@ export default function App() {
                 <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
                   <Scan className="w-6 h-6 text-white" />
                 </div>
-                <h1 className="text-xl font-bold text-slate-800 tracking-tight">Alergi<span className="text-indigo-600">Scan</span></h1>
+                <h1 className="text-xl font-bold text-slate-800 tracking-tight">Jajan<span className="text-indigo-600">Cek</span></h1>
               </div>
               
               <button 
@@ -897,7 +897,7 @@ export default function App() {
                 onClick={() => {
                   if(confirm("Hapus semua riwayat scan?")) {
                     setHistory([]);
-                    localStorage.removeItem('alergiscan_history');
+                    localStorage.removeItem('jajancek_history');
                   }
                 }}
                 className="w-full text-left py-2 text-red-600 font-semibold"
@@ -918,7 +918,7 @@ export default function App() {
             </div>
 
             <div className="text-center">
-              <p className="text-xs text-neutral-400">AlergiScan v1.0.4-MVP</p>
+              <p className="text-xs text-neutral-400">JajanCek v1.1.0-MVP</p>
               <p className="text-xs text-neutral-400">Powered by Gemini AI Studio</p>
             </div>
           </motion.div>

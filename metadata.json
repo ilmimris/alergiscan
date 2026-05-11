@@ -1,5 +1,5 @@
 {
-  "name": "AlergiScan",
+  "name": "JajanCek",
   "description": "Scan food packaging ingredients for instant allergen detection and clear safety alerts.",
   "requestFramePermissions": [
     "camera"

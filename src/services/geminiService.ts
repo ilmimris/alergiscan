@@ -1,7 +1,7 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { ScanResult, AllergenProfile } from "../types";
 
-let aiInstance: GoogleGenAI | null = null;
+let aiInstance: GoogleGenerativeAI | null = null;
 
 function getAi() {
   if (!aiInstance) {
@@ -9,27 +9,27 @@ function getAi() {
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY is missing. Please set it in your environment variables.");
     }
-    aiInstance = new GoogleGenAI(apiKey);
+    aiInstance = new GoogleGenerativeAI(apiKey);
   }
   return aiInstance;
 }
 
 export async function analyzeIngredients(input: { base64?: string; text?: string }, profile: AllergenProfile): Promise<Omit<ScanResult, 'id' | 'timestamp' | 'image'>> {
-  const ai = getAi();
-  const model = ai.getGenerativeModel({ 
-    model: "gemini-1.5-flash", // Using stable model for reliability
+  const genAI = getAi();
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash",
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: {
-        type: Type.OBJECT,
+        type: SchemaType.OBJECT,
         properties: {
-          status: { type: Type.STRING, enum: ["danger", "warning", "safe"] },
-          ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
-          foundAllergens: { type: Type.ARRAY, items: { type: Type.STRING } },
-          explanation: { type: Type.STRING }
+          status: { type: SchemaType.STRING, enum: ["danger", "warning", "safe"] },
+          ingredients: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+          foundAllergens: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+          explanation: { type: SchemaType.STRING }
         },
         required: ["status", "ingredients", "foundAllergens", "explanation"]
-      }
+      } as any
     }
   });
 
