@@ -55,31 +55,43 @@ async function startServer() {
       // 2. Post to the AJAX endpoint
       const formData = new URLSearchParams();
       formData.append('draw', '1');
-      formData.append('start', '0');
-      formData.append('length', '10');
-      formData.append('search[value]', query);
-      formData.append('search[regex]', 'false');
-      formData.append('query', query); // Keeping both just in case
       
-      // Standard DataTables columns
+      // Sync columns with the curl request
       const columns = [
-        'product_register', 'product_name', 'product_brand', 
-        'product_package', 'product_form', 'ingredients', 
-        'manufacturer_name', 'status', 'release_date',
-        'manufacturer', 'registrar'
+        { data: 'PRODUCT_ID', searchable: 'false', orderable: 'false' },
+        { data: 'PRODUCT_REGISTER', searchable: 'false', orderable: 'false' },
+        { data: 'PRODUCT_NAME', searchable: 'false', orderable: 'false' },
+        { data: 'MANUFACTURER_NAME', searchable: 'false', orderable: 'false' }
       ];
-      
+
       columns.forEach((col, i) => {
-        formData.append(`columns[${i}][data]`, col);
+        formData.append(`columns[${i}][data]`, col.data);
         formData.append(`columns[${i}][name]`, '');
-        formData.append(`columns[${i}][searchable]`, 'true');
-        formData.append(`columns[${i}][orderable]`, 'true');
+        formData.append(`columns[${i}][searchable]`, col.searchable);
+        formData.append(`columns[${i}][orderable]`, col.orderable);
         formData.append(`columns[${i}][search][value]`, '');
         formData.append(`columns[${i}][search][regex]`, 'false');
       });
-      
+
       formData.append('order[0][column]', '0');
       formData.append('order[0][dir]', 'asc');
+      formData.append('start', '0');
+      formData.append('length', '10');
+      formData.append('search[value]', '');
+      formData.append('search[regex]', 'false');
+      
+      // Empty filter fields as per curl
+      const filters = [
+        'product_register', 'product_name', 'product_brand', 'product_package', 
+        'product_form', 'ingredients', 'submit_date_start', 'submit_date_end',
+        'product_date_start', 'product_date_end', 'expire_date_start', 
+        'expire_date_end', 'manufacturer_name', 'status', 'release_date'
+      ];
+      filters.forEach(f => formData.append(f, ''));
+      
+      formData.append('query', query);
+      formData.append('manufacturer', '');
+      formData.append('registrar', '');
 
       const response = await fetch('https://cekbpom.pom.go.id/produk-dt/all', {
         method: 'POST',
@@ -96,6 +108,7 @@ async function startServer() {
           'Sec-Fetch-Dest': 'empty',
           'Sec-Fetch-Mode': 'cors',
           'Sec-Fetch-Site': 'same-origin',
+          'Priority': 'u=1, i'
         },
         body: formData.toString()
       });
