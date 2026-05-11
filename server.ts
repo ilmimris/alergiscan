@@ -14,18 +14,65 @@ async function startServer() {
 
   // Proxy for BPOM API to avoid CORS issues
   app.get("/api/bpom", async (req, res) => {
-    const query = req.query.query;
+    const query = req.query.query as string;
     if (!query) {
       return res.status(400).json({ error: "Query is required" });
     }
 
     try {
-      const response = await fetch(`https://cekbpom.pom.go.id/all-produk?query=${query}`);
+      // 1. Initial request to get session cookies and CSRF token
+      const initialResponse = await fetch('https://cekbpom.pom.go.id/all-produk', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
+      });
+      
+      const html = await initialResponse.text();
+      const setCookie = initialResponse.headers.get('set-cookie');
+      
+      // Extract CSRF token from meta tag
+      const tokenMatch = html.match(/name="csrf-token" content="([^"]+)"/);
+      const token = tokenMatch ? tokenMatch[1] : '';
+
+      // Prepare cookie string (simple join)
+      const cookies = setCookie ? setCookie.split(',').map(c => c.split(';')[0]).join('; ') : '';
+
+      // 2. Post to the AJAX endpoint used by the site
+      const formData = new URLSearchParams();
+      formData.append('draw', '1');
+      formData.append('start', '0');
+      formData.append('length', '10');
+      formData.append('query', query);
+      // Added empty fields as in the curl example to ensure compatibility
+      const fields = ['product_register', 'product_name', 'product_brand', 'product_package', 'product_form', 'ingredients', 'manufacturer_name', 'status', 'release_date'];
+      fields.forEach(f => formData.append(f, ''));
+
+      const response = await fetch('https://cekbpom.pom.go.id/produk-dt/all', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json, text/javascript, */*; q=0.01',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+          'X-CSRF-TOKEN': token,
+          'X-Requested-With': 'XMLHttpRequest',
+          'Cookie': cookies,
+          'Referer': `https://cekbpom.pom.go.id/all-produk?query=${query}`,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Origin': 'https://cekbpom.pom.go.id'
+        },
+        body: formData.toString()
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`BPOM API Error (${response.status}):`, errText);
+        return res.status(response.status).json({ error: "BPOM service error" });
+      }
+
       const data = await response.json();
       res.json(data);
     } catch (error) {
       console.error("BPOM Proxy Error:", error);
-      res.status(500).json({ error: "Gagal mengambil data BPOM" });
+      res.status(500).json({ error: "Gagal menghubungkan ke server BPOM" });
     }
   });
 
