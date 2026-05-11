@@ -616,7 +616,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="bg-slate-900 p-6 flex justify-between items-center px-10 shrink-0" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 24px) + 1.5rem)' }}>
+            <div className="bg-slate-900 p-6 flex justify-between items-center px-10 shrink-0 pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
               <label className="p-4 bg-white/10 text-white rounded-2xl backdrop-blur-md border border-white/10 cursor-pointer active:scale-95 transition-all">
                 <History className="w-6 h-6 rotate-180" />
                 <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />

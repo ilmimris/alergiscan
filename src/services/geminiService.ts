@@ -9,13 +9,30 @@ function getAi() {
     if (!apiKey) {
       throw new Error("GEMINI_API_KEY is missing. Please set it in your environment variables.");
     }
-    aiInstance = new GoogleGenAI({ apiKey });
+    aiInstance = new GoogleGenAI(apiKey);
   }
   return aiInstance;
 }
 
 export async function analyzeIngredients(input: { base64?: string; text?: string }, profile: AllergenProfile): Promise<Omit<ScanResult, 'id' | 'timestamp' | 'image'>> {
   const ai = getAi();
+  const model = ai.getGenerativeModel({ 
+    model: "gemini-1.5-flash", // Using stable model for reliability
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          status: { type: Type.STRING, enum: ["danger", "warning", "safe"] },
+          ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
+          foundAllergens: { type: Type.ARRAY, items: { type: Type.STRING } },
+          explanation: { type: Type.STRING }
+        },
+        required: ["status", "ingredients", "foundAllergens", "explanation"]
+      }
+    }
+  });
+
   const allergenList = profile.selected.join(", ") + (profile.custom?.length ? ", " + profile.custom.join(", ") : "");
   
   const prompt = `Analyze this food ingredient ${input.text ? "text" : "label image"}. 
@@ -26,15 +43,7 @@ Return a JSON object with:
 - status: "danger" (allergen found), "warning" (ambiguous, derivative, or "may contain"), "safe" (none found).
 - ingredients: Array of all detected main ingredients.
 - foundAllergens: Array of specific allergens from the user's list that were found.
-- explanation: A concise summary in Indonesian (Bahasa Indonesia) explaining the status and any warnings.
-
-Format:
-{
-  "status": "danger" | "warning" | "safe",
-  "ingredients": string[],
-  "foundAllergens": string[],
-  "explanation": string
-}`;
+- explanation: A concise summary in Indonesian (Bahasa Indonesia) explaining the status and any warnings.`;
 
   const parts: any[] = [{ text: prompt }];
   if (input.base64) {
@@ -44,25 +53,9 @@ Format:
   }
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [{ parts }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            status: { type: Type.STRING, enum: ["danger", "warning", "safe"] },
-            ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
-            foundAllergens: { type: Type.ARRAY, items: { type: Type.STRING } },
-            explanation: { type: Type.STRING }
-          },
-          required: ["status", "ingredients", "foundAllergens", "explanation"]
-        }
-      }
-    });
-
-    const data = JSON.parse(response.text || "{}");
+    const result = await model.generateContent(parts);
+    const text = result.response.text();
+    const data = JSON.parse(text || "{}");
     return data;
   } catch (error) {
     console.error("Gemini Scan Error:", error);

@@ -28,22 +28,25 @@ async function startServer() {
       });
       
       const html = await initialResponse.text();
-      const setCookie = initialResponse.headers.get('set-cookie');
       
-      // Extract CSRF token from meta tag
-      const tokenMatch = html.match(/name="csrf-token" content="([^"]+)"/);
-      const token = tokenMatch ? tokenMatch[1] : '';
+      // Better cookie handling using getSetCookie if available
+      const setCookies = (initialResponse.headers as any).getSetCookie 
+        ? (initialResponse.headers as any).getSetCookie() 
+        : (initialResponse.headers.get('set-cookie')?.split(',') || []);
+      
+      const cookieString = setCookies.map((c: string) => c.split(';')[0]).join('; ');
+      
+      // Extract CSRF token from meta tag with more robust regex
+      const tokenMatch = html.match(/name=["']csrf-token["']\s+content=["']([^"']+)["']/) 
+                      || html.match(/content=["']([^"']+)["']\s+name=["']csrf-token["']/);
+      const token = (tokenMatch ? tokenMatch[1] : '').trim();
 
-      // Prepare cookie string (simple join)
-      const cookies = setCookie ? setCookie.split(',').map(c => c.split(';')[0]).join('; ') : '';
-
-      // 2. Post to the AJAX endpoint used by the site
+      // 2. Post to the AJAX endpoint
       const formData = new URLSearchParams();
       formData.append('draw', '1');
       formData.append('start', '0');
       formData.append('length', '10');
       formData.append('query', query);
-      // Added empty fields as in the curl example to ensure compatibility
       const fields = ['product_register', 'product_name', 'product_brand', 'product_package', 'product_form', 'ingredients', 'manufacturer_name', 'status', 'release_date'];
       fields.forEach(f => formData.append(f, ''));
 
@@ -54,8 +57,8 @@ async function startServer() {
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
           'X-CSRF-TOKEN': token,
           'X-Requested-With': 'XMLHttpRequest',
-          'Cookie': cookies,
-          'Referer': `https://cekbpom.pom.go.id/all-produk?query=${query}`,
+          'Cookie': cookieString.trim(),
+          'Referer': `https://cekbpom.pom.go.id/all-produk?query=${encodeURIComponent(query)}`,
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Origin': 'https://cekbpom.pom.go.id'
         },
