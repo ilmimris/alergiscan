@@ -19,7 +19,10 @@ import {
   Plus,
   Trash2,
   Loader2,
-  Scan
+  Scan,
+  Search,
+  ShieldCheck,
+  ExternalLink
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { ALLERGENS } from './constants';
@@ -29,7 +32,7 @@ import ReactMarkdown from 'react-markdown';
 import confetti from 'canvas-confetti';
 
 export default function App() {
-  const [view, setView] = useState<'onboarding' | 'home' | 'scanning' | 'result' | 'history' | 'settings'>('onboarding');
+  const [view, setView] = useState<'onboarding' | 'home' | 'scanning' | 'result' | 'history' | 'settings' | 'bpom-result'>('onboarding');
   const [profile, setProfile] = useState<AllergenProfile>({ selected: [] });
   const [history, setHistory] = useState<ScanResult[]>([]);
   const [currentResult, setCurrentResult] = useState<ScanResult | null>(null);
@@ -37,6 +40,27 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [manualInput, setManualInput] = useState("");
   const [showManual, setShowManual] = useState(false);
+  const [bpomQuery, setBpomQuery] = useState("");
+  const [bpomResult, setBpomResult] = useState<any>(null);
+  const [showBpom, setShowBpom] = useState(false);
+
+  const checkBpom = async (query: string) => {
+    if (!query.trim()) return;
+    setIsProcessing(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/bpom?query=${encodeURIComponent(query)}`);
+      const data = await response.json();
+      setBpomResult(data);
+      setView('bpom-result');
+      setShowBpom(false);
+      setBpomQuery("");
+    } catch (err: any) {
+      setError("Gagal mengecek BPOM. Coba lagi nanti.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const performManualScan = async (text: string) => {
     if (!text.trim()) return;
@@ -366,6 +390,46 @@ export default function App() {
             </button>
           </div>
 
+          <button
+            id="btn-bpom-toggle"
+            onClick={() => setShowBpom(!showBpom)}
+            className="w-full py-4 bg-white border border-slate-200 rounded-2xl font-bold text-slate-600 flex items-center justify-center gap-2 hover:bg-slate-100 hover:border-slate-300 transition-all shadow-sm"
+          >
+            <ShieldCheck className="w-5 h-5 text-emerald-600" />
+            Cek BPOM (Nomor Registrasi)
+          </button>
+
+          <AnimatePresence>
+            {showBpom && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="space-y-3 bg-white p-5 rounded-3xl border border-slate-200 shadow-xl"
+              >
+                <div className="relative">
+                  <input 
+                    type="text"
+                    value={bpomQuery}
+                    onChange={(e) => setBpomQuery(e.target.value)}
+                    placeholder="Masukkan nomor MD/ML/NA..."
+                    className="w-full p-4 pl-12 bg-slate-50 rounded-2xl border border-slate-100 text-sm focus:ring-4 focus:ring-emerald-100 focus:border-emerald-300 focus:outline-none font-medium"
+                  />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                </div>
+                <button
+                  id="btn-bpom-scan"
+                  onClick={() => checkBpom(bpomQuery)}
+                  disabled={isProcessing || !bpomQuery.trim()}
+                  className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 disabled:bg-slate-300 shadow-lg active:scale-95 transition-all"
+                >
+                  {isProcessing ? <Loader2 className="animate-spin w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
+                  Cek Keaslian BPOM
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <AnimatePresence>
             {showManual && (
               <motion.div 
@@ -669,6 +733,113 @@ export default function App() {
     );
   };
 
+  const BpomResultView = () => {
+    if (!bpomResult) return null;
+    const items = bpomResult.data || [];
+    const isVerified = items.length > 0;
+
+    return (
+      <motion.div 
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="min-h-screen flex flex-col bg-slate-50 px-6 py-8 space-y-6 max-w-md mx-auto"
+        id="bpom-result-view"
+      >
+        <header className="flex items-center gap-4">
+          <button 
+            onClick={() => setView('home')} 
+            className="p-3 bg-white rounded-2xl shadow-sm border border-slate-200 text-slate-600"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <h2 className="text-xl font-bold text-slate-800 tracking-tight">Status BPOM</h2>
+        </header>
+
+        <div className={cn(
+          "p-8 rounded-[2.5rem] border-2 relative overflow-hidden shadow-2xl text-center",
+          isVerified ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-red-50 border-red-200 text-red-800"
+        )}>
+          <div className="flex flex-col items-center gap-4 relative z-10">
+            <div className={cn(
+              "w-20 h-20 rounded-full flex items-center justify-center shadow-lg",
+              isVerified ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+            )}>
+              {isVerified ? <ShieldCheck className="w-12 h-12" /> : <AlertTriangle className="w-12 h-12" />}
+            </div>
+            <div>
+              <h3 className="text-2xl font-black tracking-tight mb-1">
+                {isVerified ? "Terverifikasi BPOM" : "Tidak Ditemukan"}
+              </h3>
+              <p className="text-sm font-bold opacity-70 uppercase tracking-widest">
+                {isVerified ? "Produk Terdaftar Resmi" : "Periksa Kembali Nomor MD/ML/NA"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {isVerified && items.map((item: any, idx: number) => (
+          <div key={idx} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Nama Produk</p>
+              <p className="font-extrabold text-slate-800 leading-tight">{item.PRODUCT_NAME}</p>
+              <p className="text-xs font-bold text-indigo-600">{item.PRODUCT_BRANDS}</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Nomor Reg</p>
+                <p className="font-bold text-slate-700 text-sm">{item.PRODUCT_REGISTER}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Tgl Terbit</p>
+                <p className="font-bold text-slate-700 text-sm">{item.PRODUCT_DATE}</p>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Pendaftar/Produsen</p>
+              <p className="font-bold text-slate-700 text-sm leading-tight">{item.REGISTRAR}</p>
+              <p className="text-[10px] text-slate-500">{item.REGISTRAR_ADD}</p>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100">
+              <a 
+                href={`https://cekbpom.pom.go.id/produk/${item.PRODUCT_ID}/02/detail`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-slate-600 flex items-center justify-center gap-2 hover:bg-slate-100 transition-all text-sm"
+              >
+                Lihat Detail di Web BPOM
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
+          </div>
+        ))}
+
+        {!isVerified && (
+          <div className="p-6 bg-white rounded-3xl border border-slate-200 shadow-sm text-center space-y-4">
+            <p className="text-slate-500 font-medium">Nomor registrasi yang Anda masukkan tidak terdaftar di database BPOM RI. Pastikan nomor yang dimasukkan sudah benar.</p>
+            <button 
+              onClick={() => setView('home')}
+              className="px-8 py-3 bg-slate-900 text-white rounded-full font-bold text-sm"
+            >
+              Coba Nomor Lain
+            </button>
+          </div>
+        )}
+
+        <div className="pt-4">
+          <button 
+            onClick={() => setView('home')}
+            className="w-full py-5 bg-indigo-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-sm shadow-lg active:scale-95 transition-all"
+          >
+            Kembali ke Beranda
+          </button>
+        </div>
+      </motion.div>
+    );
+  };
+
   const SettingsView = () => (
     <div className="min-h-screen bg-neutral-50 flex flex-col p-6 space-y-8" id="settings-view">
       <header className="flex items-center gap-4">
@@ -820,6 +991,31 @@ export default function App() {
     </div>
   );
 
+  const LoadingOverlay = () => (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-md"
+    >
+      <div className="relative mb-8">
+        <div className="w-24 h-24 border-4 border-indigo-500/20 rounded-[2rem] absolute animate-pulse"></div>
+        <div className="w-24 h-24 border-t-4 border-indigo-500 rounded-[2rem] animate-spin"></div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Scan className="w-8 h-8 text-white animate-pulse" />
+        </div>
+      </div>
+      <div className="text-center space-y-2">
+        <h3 className="text-xl font-black text-white uppercase tracking-tighter">Menganalisis...</h3>
+        <p className="text-indigo-300 text-xs font-bold uppercase tracking-[0.2em] animate-pulse">Menghubungkan ke Gemini AI</p>
+      </div>
+      
+      {/* Decorative Geometry */}
+      <div className="absolute top-10 left-10 w-20 h-20 border border-white/5 rounded-full"></div>
+      <div className="absolute bottom-20 right-10 w-32 h-32 border border-white/5 rounded-[3rem] rotate-12"></div>
+    </motion.div>
+  );
+
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen relative shadow-2xl">
       <AnimatePresence mode="wait">
@@ -829,6 +1025,11 @@ export default function App() {
         {view === 'result' && <Result key="result" />}
         {view === 'history' && <HistoryView key="history" />}
         {view === 'settings' && <SettingsView key="settings" />}
+        {view === 'bpom-result' && <BpomResultView key="bpom-result" />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isProcessing && <LoadingOverlay />}
       </AnimatePresence>
     </div>
   );
