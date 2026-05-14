@@ -14,7 +14,8 @@ spec:
     metadata:
       labels:
         app: alergiscan
-    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: alergiscan
           image: ghcr.io/ilmimris/alergiscan:latest
