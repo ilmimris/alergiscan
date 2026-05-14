@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: alergiscan
+  namespace: alergiscan
+spec:
+  selector:
+    app: alergiscan
+  ports:
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+      name: http
